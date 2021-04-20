@@ -1,5 +1,5 @@
 
-trait OpBinaryHetero {
+pub trait OpBinaryHetero {
     type I1;
     type I2;
     type O;
@@ -7,16 +7,9 @@ trait OpBinaryHetero {
     fn apply(a: Self::I1, b: Self::I2) -> Self::O;
 }
 
-trait OpBinary : OpBinaryHetero
-where
-    Self : OpBinaryHetero<I1 = <Self as OpBinary>::T>,
-    Self : OpBinaryHetero<I2 = <Self as OpBinary>::T>,
-    Self : OpBinaryHetero<O  = <Self as OpBinary>::T>,
-{
-    type T;
-}
+/** Relations *****************************************************************/
 
-trait Relation : OpBinaryHetero
+pub trait Relation : OpBinaryHetero
 where
     Self : OpBinaryHetero<I1 = <Self as Relation>::T>,
     Self : OpBinaryHetero<I2 = <Self as Relation>::T>,
@@ -25,29 +18,29 @@ where
     type T;
 }
 
-trait Symmetric : Relation
-where
-    <Self as Relation>::T : Clone
+pub trait Symmetric : Relation
 {
-    fn check(a: &Self::T, b: &Self::T) -> bool {
+    fn check(a: &Self::T, b: &Self::T) -> bool
+    where Self::T : Clone
+    {
         Self::apply(a.clone(), b.clone()) == Self::apply(b.clone(), a.clone())
     }
 }
 
-trait Reflexive : Relation
-where
-    <Self as Relation>::T : Clone,
+pub trait Reflexive : Relation
 {
-    fn check(a: &Self::T) -> bool {
+    fn check(a: &Self::T) -> bool
+    where Self::T : Clone
+    {
         Self::apply(a.clone(), a.clone())
     }
 }
 
-trait Transitive : Relation
-where
-    <Self as Relation>::T : Clone,
+pub trait Transitive : Relation
 {
-    fn check(a: &Self::T, b : &Self::T, c : &Self::T) -> bool {
+    fn check(a: &Self::T, b : &Self::T, c : &Self::T) -> bool
+    where Self::T : Clone
+    {
         if Self::apply(a.clone(), b.clone()) && Self::apply(b.clone(), c.clone()) {
             Self::apply(a.clone(), c.clone())
         } else {
@@ -57,48 +50,21 @@ where
 }
 
 trait Equivalence : Symmetric + Reflexive + Transitive
-where
-    <Self as Relation>::T : Clone
 {
-    fn check(a: &Self::T, b: &Self::T, c : &Self::T) -> bool {
-        <Self as Reflexive>::check(a) &&
-        <Self as Symmetric>::check(a,b) &&
+    fn check(a: &Self::T, b: &Self::T, c : &Self::T) -> bool
+    where Self::T : Clone
+    {
+        <Self as Reflexive>::check(a)      &&
+        <Self as Symmetric>::check(a,b)    &&
         <Self as Transitive>::check(a,b,c)
     }
 }
-
-/*
-trait OpCommutative<Equality = StandardEquality<<Self as OpBinary>::O>>
-where
-    Self : OpBinary<I1 = <Self as OpBinary>::I2>,
-    Equality : OpBinary<I1 = Self::O, I2 = Self::O, O = bool>,
-    <Self as OpBinary>::I1 : Clone,
-{
-    fn check(a: &Self::I1, b: &Self::I2) -> bool {
-        Equality::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
-    }
-}
-
-trait OpAssociative<Equality = StandardEquality<<Self as OpBinary>::O>>
-where
-    Self : OpBinary<I1 = <Self as OpBinary>::I2, O = <Self as OpBinary>::I2>,
-    Equality : OpBinary<I1 = Self::O, I2 = Self::O, O = bool>,
-    <Self as OpBinary>::I1 : Clone,
-{
-    fn check(a: &Self::I1, b: &Self::I2) -> bool {
-        Equality::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
-    }
-}
-
-
-trait BinaryRelation<T> : OpBinary<I1 = T, I2 = T, O = bool> {}
-impl <O : OpBinary<I1 = T, I2 = T, O = bool>> BinaryRelation<O> {}
 
 /** Standard equality *********************************************************/
 
 struct StandardEquality<T : Eq> { phantom: std::marker::PhantomData<T> }
 
-impl <T : Eq> OpBinary for StandardEquality<T> {
+impl <T : Eq> OpBinaryHetero for StandardEquality<T> {
     type I1 = T;
     type I2 = T;
     type O  = bool;
@@ -106,16 +72,135 @@ impl <T : Eq> OpBinary for StandardEquality<T> {
     fn apply(a: T, b: T) -> bool { a == b }
 }
 
-impl <T : Eq + Clone> OpCommutative for StandardEquality<T> {
+impl <T : Eq> Relation for StandardEquality<T> {
+    type T = T;
 }
 
+impl <T : Eq> Reflexive  for StandardEquality<T> { }
+impl <T : Eq> Symmetric  for StandardEquality<T> { }
+impl <T : Eq> Transitive for StandardEquality<T> { }
+impl <T : Eq> Equivalence for StandardEquality<T> { }
 
+/** Modular equality **********************************************************/
+
+struct  ModularI64Equiv<const MODULUS : i64>;
+
+impl <const N : i64> OpBinaryHetero for ModularI64Equiv<N> {
+    type I1 = i64;
+    type I2 = i64;
+    type O  = bool;
+
+    fn apply(a: i64, b: i64) -> bool { a % N == b % N }
+}
+
+impl <const N : i64> Relation for ModularI64Equiv<N> {
+    type T = i64;
+}
+
+impl <const N : i64> Reflexive   for ModularI64Equiv<N> { }
+impl <const N : i64> Symmetric   for ModularI64Equiv<N> { }
+impl <const N : i64> Transitive  for ModularI64Equiv<N> { }
+impl <const N : i64> Equivalence for ModularI64Equiv<N> { }
+
+/** Setoid ********************************************************************/
+
+trait Setoid {
+    type T;
+    type Equiv : Equivalence<T = Self::T>;
+
+    fn eq(a: Self::T, b: Self::T) -> bool {
+        Self::Equiv::apply(a,b)
+    }
+
+    fn neq(a: Self::T, b: Self::T) -> bool {
+        ! Self::Equiv::apply(a,b)
+    }
+
+    fn check(a: &Self::T, b: &Self::T, c: &Self::T) -> bool
+    where Self::T : Clone
+    {
+        <Self::Equiv as Equivalence>::check(a,b,c)
+    }
+}
+
+/** Binary operations *********************************************************/
+
+pub trait OpBinary : OpBinaryHetero
+where
+    Self : OpBinaryHetero<I1 = <Self as OpBinary>::T>,
+    Self : OpBinaryHetero<I2 = <Self as OpBinary>::T>,
+    Self : OpBinaryHetero<O  = <Self as OpBinary>::T>,
+{
+    type T;
+}
+
+trait Commutative<Equiv> : OpBinary
+where
+    Equiv : Equivalence<T = <Self as OpBinary>::T>
+{
+    fn check(a: &Self::T, b: &Self::T) -> bool
+    where Self::T : Clone
+    {
+        Equiv::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
+    }
+}
+
+trait Associative<Equiv> : OpBinary
+where
+    Equiv : Equivalence<T = <Self as OpBinary>::T>
+{
+    fn check(a: &Self::T, b: &Self::T) -> bool
+    where Self::T : Clone
+    {
+        Equiv::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
+    }
+}
+
+trait HasIdentity<Equiv> : OpBinary
+where
+    Equiv : Equivalence<T = <Self as OpBinary>::T>
+{
+    const IDENTITY : Self::T;
+
+    fn check(a: &Self::T) -> bool
+    where Self::T : Clone
+    {
+        // id ⊕ a = a
+        Equiv::apply(Self::apply(Self::IDENTITY, a.clone()), a.clone())
+
+        // a ⊕ id = a
+        && Equiv::apply(Self::apply(a.clone(), Self::IDENTITY), a.clone())
+    }
+}
+
+trait HasInverses<Equiv> : HasIdentity<Equiv>
+where
+    Equiv : Equivalence<T = <Self as OpBinary>::T>
+{
+    fn inverse(a: Self::T) -> Self::T;
+
+    fn check(a: &Self::T) -> bool
+    where Self::T : Clone
+    {
+        // a ⊕ inv(a) = id
+        Equiv::apply(
+            Self::apply(a.clone(), Self::inverse(a.clone())),
+            Self::IDENTITY
+        )
+
+        // inv(a) ⊕ a = id
+        && Equiv::apply(
+            Self::apply(Self::inverse(a.clone()), a.clone()),
+            Self::IDENTITY
+        )
+    }
+}
 
 /** Standard addition *********************************************************/
 
 struct StandardAddition<L : std::ops::Add<R>, R> { phantom: std::marker::PhantomData<(L,R)> }
 
-impl <L : std::ops::Add<R>,R> OpBinary for StandardAddition<L,R> {
+impl <L : std::ops::Add<R>,R> OpBinaryHetero for StandardAddition<L,R> {
     type I1 = L;
     type I2 = R;
     type O  = <L as std::ops::Add<R>>::Output;
@@ -123,6 +208,29 @@ impl <L : std::ops::Add<R>,R> OpBinary for StandardAddition<L,R> {
     fn apply(a: L, b: R) -> Self::O { a + b }
 }
 
+impl <T> OpBinary for StandardAddition<T,T>
+where
+    T : std::ops::Add<T,Output=T>
+{
+    type T = T;
+}
+
+impl <T> Commutative<StandardEquality<T>> for StandardAddition<T,T>
+where
+    T : std::ops::Add<T,Output=T>,
+    T : Eq
+{}
+
+impl <T> Associative<StandardEquality<T>> for StandardAddition<T,T>
+where
+    T : std::ops::Add<T,Output=T>,
+    T : Eq
+{}
+
+
+
+
+/*
 impl <T> OpCommutative for StandardAddition<T,T>
 where
     T : std::ops::Add<T> + Clone,
