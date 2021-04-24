@@ -76,9 +76,9 @@ impl <T : Eq> Relation for StandardEquality<T> {
     type T = T;
 }
 
-impl <T : Eq> Reflexive  for StandardEquality<T> { }
-impl <T : Eq> Symmetric  for StandardEquality<T> { }
-impl <T : Eq> Transitive for StandardEquality<T> { }
+impl <T : Eq> Reflexive   for StandardEquality<T> { }
+impl <T : Eq> Symmetric   for StandardEquality<T> { }
+impl <T : Eq> Transitive  for StandardEquality<T> { }
 impl <T : Eq> Equivalence for StandardEquality<T> { }
 
 /** Modular equality **********************************************************/
@@ -134,6 +134,47 @@ where
     type T;
 }
 
+struct WrapperSingleOp<O : OpBinary + ?Sized, E : Equivalence<T = O::T>>
+{
+    value: O::T,
+    _phantom: std::marker::PhantomData<E>,
+}
+
+impl <O : OpBinary + ?Sized, E : Equivalence<T = O::T>> Wrapper<O,E>
+{
+    fn new(v: &O::T) -> Self
+    where O::T : Clone
+    {
+        Wrapper { value: v.clone(), _phantom: std::marker::PhantomData }
+    }
+}
+
+impl <O, E> PartialEq for Wrapper<O, E>
+where
+    O : OpBinary + ?Sized,
+    E : Equivalence<T = O::T>,
+    O::T : Clone
+{
+    fn eq(&self, other: &Self) -> bool {
+        E::apply(self.value.clone(), other.value.clone())
+    }
+}
+
+impl <O,E> std::ops::BitAnd for Wrapper<O, E>
+where
+    O : OpBinary + ?Sized,
+    E : Equivalence<T = O::T>,
+    O::T : Clone
+{
+    type Output = Self;
+
+    fn bitand(self, other: Self) -> Self {
+        Wrapper { value : O::apply(self.value.clone(), other.value.clone()), _phantom: std::marker::PhantomData }
+    }
+}
+
+
+
 trait Commutative<Equiv> : OpBinary
 where
     Equiv : Equivalence<T = <Self as OpBinary>::T>
@@ -141,7 +182,11 @@ where
     fn check(a: &Self::T, b: &Self::T) -> bool
     where Self::T : Clone
     {
-        Equiv::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
+        let w = |a : &Self::T| Wrapper::<Self,Equiv>::new(a);
+
+        w(a) & w(b) == w(b) & w(a)
+
+        // Equiv::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
     }
 }
 
@@ -227,10 +272,20 @@ where
     T : Eq
 {}
 
-
-
-
 /*
+trait Zero : std::ops::Add<Self,Output = Self> {
+    const ZERO : Self;
+}
+
+impl <T> HasIdentity<StandardEquality<T>> for StandardAddition<T,T>
+where
+    T : Zero,
+    T : Eq,
+{
+    const IDENTITY : T = T::ZERO;
+}
+
+
 impl <T> OpCommutative for StandardAddition<T,T>
 where
     T : std::ops::Add<T> + Clone,
