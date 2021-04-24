@@ -49,7 +49,7 @@ pub trait Transitive : Relation
     }
 }
 
-trait Equivalence : Symmetric + Reflexive + Transitive
+pub trait Equivalence : Symmetric + Reflexive + Transitive
 {
     fn check(a: &Self::T, b: &Self::T, c : &Self::T) -> bool
     where Self::T : Clone
@@ -104,7 +104,7 @@ impl <const N : i64> Equivalence for ModularI64Equiv<N> { }
 
 /** Setoid ********************************************************************/
 
-trait Setoid {
+pub trait Setoid {
     type T;
     type Equiv : Equivalence<T = Self::T>;
 
@@ -134,22 +134,29 @@ where
     type T;
 }
 
-struct Wrapper<O : OpBinary + ?Sized, E : Equivalence<T = O::T>>
+/** Magma wrapper *************************************************************/
+
+struct MagmaWrapper<O : OpBinary + ?Sized, E : Equivalence<T = O::T>>
 {
     value: O::T,
     _phantom: std::marker::PhantomData<E>,
 }
 
-impl <O : OpBinary + ?Sized, E : Equivalence<T = O::T>> Wrapper<O,E>
+impl <O : OpBinary + ?Sized, E : Equivalence<T = O::T>> MagmaWrapper<O,E>
 {
-    fn new(v: &O::T) -> Self
-    where O::T : Clone
+    fn new(v: O::T) -> Self
     {
-        Wrapper { value: v.clone(), _phantom: std::marker::PhantomData }
+        MagmaWrapper { value: v, _phantom: std::marker::PhantomData }
+    }
+
+    fn inv(self) -> Self
+    where O : HasInverses<E>
+    {
+        Self::new(O::inverse(self.value))
     }
 }
 
-impl <O, E> PartialEq for Wrapper<O, E>
+impl <O, E> PartialEq for MagmaWrapper<O, E>
 where
     O : OpBinary + ?Sized,
     E : Equivalence<T = O::T>,
@@ -160,7 +167,7 @@ where
     }
 }
 
-impl <O,E> std::ops::BitAnd for Wrapper<O, E>
+impl <O,E> std::ops::BitAnd for MagmaWrapper<O, E>
 where
     O : OpBinary + ?Sized,
     E : Equivalence<T = O::T>,
@@ -169,20 +176,20 @@ where
     type Output = Self;
 
     fn bitand(self, other: Self) -> Self {
-        Wrapper { value : O::apply(self.value.clone(), other.value.clone()), _phantom: std::marker::PhantomData }
+        MagmaWrapper { value : O::apply(self.value.clone(), other.value.clone()), _phantom: std::marker::PhantomData }
     }
 }
 
+/** Marker traits for BinaryOps ***********************************************/
 
-
-trait Commutative<Equiv> : OpBinary
+pub trait Commutative<Equiv> : OpBinary
 where
     Equiv : Equivalence<T = <Self as OpBinary>::T>
 {
     fn check(a: &Self::T, b: &Self::T) -> bool
     where Self::T : Clone
     {
-        let w = |a : &Self::T| Wrapper::<Self,Equiv>::new(a);
+        let w = |a : &Self::T| MagmaWrapper::<Self,Equiv>::new(a.clone());
 
         w(a) & w(b) == w(b) & w(a)
 
@@ -190,20 +197,20 @@ where
     }
 }
 
-trait Associative<Equiv> : OpBinary
+pub trait Associative<Equiv> : OpBinary
 where
     Equiv : Equivalence<T = <Self as OpBinary>::T>
 {
     fn check(a: &Self::T, b: &Self::T, c: &Self::T) -> bool
     where Self::T : Clone
     {
-        let w = |a : &Self::T| Wrapper::<Self,Equiv>::new(a);
+        let w = |a : &Self::T| MagmaWrapper::<Self,Equiv>::new(a.clone());
 
         w(a) & (w(b) & w(c)) == (w(a) & w(b)) & w(c)
     }
 }
 
-trait HasIdentity<Equiv> : OpBinary
+pub trait HasIdentity<Equiv> : OpBinary
 where
     Equiv : Equivalence<T = <Self as OpBinary>::T>
 {
@@ -212,15 +219,15 @@ where
     fn check(a: &Self::T) -> bool
     where Self::T : Clone
     {
-        // id ⊕ a = a
-        Equiv::apply(Self::apply(Self::IDENTITY, a.clone()), a.clone())
+        let w = |a : &Self::T| MagmaWrapper::<Self,Equiv>::new(a.clone());
 
-        // a ⊕ id = a
-        && Equiv::apply(Self::apply(a.clone(), Self::IDENTITY), a.clone())
+        w(a) & w(&Self::IDENTITY) == w(a)
+        &&
+        w(&Self::IDENTITY) & w(a) == w(a)
     }
 }
 
-trait HasInverses<Equiv> : HasIdentity<Equiv>
+pub trait HasInverses<Equiv> : HasIdentity<Equiv>
 where
     Equiv : Equivalence<T = <Self as OpBinary>::T>
 {
@@ -229,19 +236,41 @@ where
     fn check(a: &Self::T) -> bool
     where Self::T : Clone
     {
-        // a ⊕ inv(a) = id
-        Equiv::apply(
-            Self::apply(a.clone(), Self::inverse(a.clone())),
-            Self::IDENTITY
-        )
+        let w = |a : &Self::T| MagmaWrapper::<Self,Equiv>::new(a.clone());
 
-        // inv(a) ⊕ a = id
-        && Equiv::apply(
-            Self::apply(Self::inverse(a.clone()), a.clone()),
-            Self::IDENTITY
-        )
+        <Self as HasIdentity<Equiv>>::check(a)
+        &&
+        w(a) & w(a).inv() == w(&Self::IDENTITY)
+        &&
+        w(a).inv() & w(a) == w(&Self::IDENTITY)
     }
 }
+
+/** Group-like structures *****************************************************/
+
+pub trait Magma : Setoid {
+    type Op : OpBinary<T = Self::T>;
+}
+
+pub trait Semigroup : Magma
+where Self::Op : Associative<Self::Equiv>
+{}
+
+// TODO: why do I need to repeat where clause from Semigroup here?  Should be inherited?
+// 
+// according to someone on discord, this is a shortcoming in the way the compiler checks where
+// clauses; there's no fundamental problem.
+pub trait Monoid : Semigroup
+where Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv>
+{}
+
+pub trait Group : Monoid
+where Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv>
+{}
+
+pub trait GroupAbelian : Group
+where Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv> + Commutative<Self::Equiv>
+{}
 
 /** Standard addition *********************************************************/
 
