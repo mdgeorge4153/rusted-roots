@@ -134,22 +134,22 @@ where
     type T;
 }
 
-struct WrapperSingleOp<O : OpBinary + ?Sized, E : Equivalence<T = O::T>>
+struct WrapperSingleOp<'a, O : OpBinary + ?Sized, E : Equivalence<T = O::T>>
 {
-    value: O::T,
+    value: &'a O::T,
     _phantom: std::marker::PhantomData<E>,
 }
 
-impl <O : OpBinary + ?Sized, E : Equivalence<T = O::T>> Wrapper<O,E>
+impl <'a, O : OpBinary + ?Sized, E : Equivalence<T = O::T>> Wrapper<'a,O,E>
 {
-    fn new(v: &O::T) -> Self
+    fn new(v: &'a O::T) -> Self
     where O::T : Clone
     {
-        Wrapper { value: v.clone(), _phantom: std::marker::PhantomData }
+        Wrapper { value: v, _phantom: std::marker::PhantomData }
     }
 }
 
-impl <O, E> PartialEq for Wrapper<O, E>
+impl <'a, O, E> PartialEq for Wrapper<'a, O, E>
 where
     O : OpBinary + ?Sized,
     E : Equivalence<T = O::T>,
@@ -197,7 +197,9 @@ where
     fn check(a: &Self::T, b: &Self::T) -> bool
     where Self::T : Clone
     {
-        Equiv::apply(Self::apply(a.clone(),b.clone()) , Self::apply(b.clone(),a.clone()))
+        let w = |a : &Self::T| Wrapper::<Self,Equiv>::new(a);
+
+        w(a) & (w(b) & w(c)) == (w(a) & w(b)) & w(c)
     }
 }
 
