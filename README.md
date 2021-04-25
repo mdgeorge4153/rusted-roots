@@ -1,7 +1,9 @@
-Rooty
-=====
+Rusted-roots
+============
 
-This project aims to reflect basic algebraic structures in the Rust type system.
+This project aims to reflect basic algebraic structures in the Rust type system,
+and to provide efficient implementations of those structures providing exact
+predicates for various kinds of irrational numbers.
 
 This is a project I'm developing to help me learn Rust.  It has similar goals
 and design to [alga](https://docs.rs/alga/0.9.3/alga/).  See also my
@@ -14,13 +16,11 @@ Here are my desiderata:
    The documentation should clearly include exactly what must be implemented
    and what properties those implementations require.
 
- - for number type users: it should be easy to adapt existing number libraries
-  
+ - for number type users: it should be easy to adapt existing number types
 
  - for number type users: it shouldn't be much harder to write code that is
    generic with respect to number types.  In particular, it should be possible
    to use + and * to manipulate elements of a ring.
-
 
  - for the library design: the trait definitions should be easy to work with
    and clearly translate to standard mathematical language.  For example, it

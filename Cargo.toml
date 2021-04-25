@@ -1,5 +1,5 @@
 [package]
-name = "rooty"
+name = "rusted-roots"
 version = "0.1.0"
 authors = ["Michael George <mdgeorge@cs.cornell.edu>"]
 edition = "2018"
