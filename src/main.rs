@@ -264,19 +264,19 @@ where
 
 pub trait Monoid : Semigroup
 where
-    Self::Op : Associative<Self::Equiv> // TODO: remove
+    Self::Op : Associative<Self::Equiv>, // TODO: remove
     Self::Op : HasIdentity<Self::Equiv>
 {}
 
 pub trait Group : Monoid
 where
-    Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> // TODO: remove
+    Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv>, // TODO: remove
     Self::Op : HasInverses<Self::Equiv>
 {}
 
 pub trait GroupAbelian : Group
 where
-    Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv> // TODO: remove
+    Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv>, // TODO: remove
     Self::Op : Commutative<Self::Equiv>
 {}
 
