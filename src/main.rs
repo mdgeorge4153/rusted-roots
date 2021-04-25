@@ -248,28 +248,36 @@ where
 
 /** Group-like structures *****************************************************/
 
+// TODO: why do I need to repeat where clause from Semigroup here?  Should be inherited?
+//
+// This seems to need implied traits - see RFC 2089:
+// https://github.com/rust-lang/rust/issues/44491
+
 pub trait Magma : Setoid {
     type Op : OpBinary<T = Self::T>;
 }
 
 pub trait Semigroup : Magma
-where Self::Op : Associative<Self::Equiv>
+where
+    Self::Op : Associative<Self::Equiv>
 {}
 
-// TODO: why do I need to repeat where clause from Semigroup here?  Should be inherited?
-// 
-// according to someone on discord, this is a shortcoming in the way the compiler checks where
-// clauses; there's no fundamental problem.
 pub trait Monoid : Semigroup
-where Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv>
+where
+    Self::Op : Associative<Self::Equiv> // TODO: remove
+    Self::Op : HasIdentity<Self::Equiv>
 {}
 
 pub trait Group : Monoid
-where Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv>
+where
+    Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> // TODO: remove
+    Self::Op : HasInverses<Self::Equiv>
 {}
 
 pub trait GroupAbelian : Group
-where Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv> + Commutative<Self::Equiv>
+where
+    Self::Op : Associative<Self::Equiv> + HasIdentity<Self::Equiv> + HasInverses<Self::Equiv> // TODO: remove
+    Self::Op : Commutative<Self::Equiv>
 {}
 
 /** Standard addition *********************************************************/
@@ -302,29 +310,6 @@ where
     T : std::ops::Add<T,Output=T>,
     T : Eq
 {}
-
-/*
-trait Zero : std::ops::Add<Self,Output = Self> {
-    const ZERO : Self;
-}
-
-impl <T> HasIdentity<StandardEquality<T>> for StandardAddition<T,T>
-where
-    T : Zero,
-    T : Eq,
-{
-    const IDENTITY : T = T::ZERO;
-}
-
-
-impl <T> OpCommutative for StandardAddition<T,T>
-where
-    T : std::ops::Add<T> + Clone,
-    <T as std::ops::Add<T>>::Output : Eq
-{
-}
-
-*/
 
 fn main() {
     println!("hello world");
